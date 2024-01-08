@@ -52,8 +52,18 @@ pub struct Command {
     current_dir: String,
 }
 
-fn main() {
-    let builder = Command::builder();
+#[derive(Builder)]
+pub struct Unnamed(i32, i32);
 
-    let _ = builder;
+#[derive(Builder)]
+pub struct Unit;
+
+fn main() {
+    let builder: CommandBuilder = Command::builder();
+    let _ = builder.executable;
+
+    let unnamed = Unnamed::builder();
+    let _ = unnamed.field_0;
+
+    let unit = Unit::builder();
 }
