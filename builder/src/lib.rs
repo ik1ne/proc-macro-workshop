@@ -1,7 +1,8 @@
+use crate::helper::get_each_from_builder_attribute;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Fields};
+use syn::{parse_macro_input, Data, DeriveInput};
 
 mod helper;
 
@@ -29,9 +30,11 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
     let ident_builder = format_ident!("{}Builder", ident);
 
-    let ident_builder_fields = map_fields(data, |field| {
+    let ident_builder_fields = helper::map_fields(data, |field| {
         let field_ident = &field.ident;
-        eprintln!("{:?}\n\n\n--", field.attrs.first().to_token_stream());
+
+        get_each_from_builder_attribute(field);
+
         quote_spanned! {field.span()=>
             #field_ident: None
         }
@@ -51,7 +54,7 @@ fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
 fn struct_ident_builder(ident: &Ident, data: &Data) -> TokenStream {
     let ident_builder = format_ident!("{}Builder", ident);
 
-    let struct_fields = map_fields(data, |field| {
+    let struct_fields = helper::map_fields(data, |field| {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
@@ -90,7 +93,7 @@ fn impl_ident_builder(ident: &Ident, data: &Data) -> TokenStream {
 }
 
 fn impl_ident_builder_setter(data: &Data) -> TokenStream {
-    let setters = map_fields(data, |field| {
+    let setters = helper::map_fields(data, |field| {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
@@ -131,7 +134,7 @@ fn impl_ident_builder_build(ident: &Ident, data: &Data) -> TokenStream {
 }
 
 fn local_vars(data: &Data) -> TokenStream {
-    let lines = map_fields(data, |field| {
+    let lines = helper::map_fields(data, |field| {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
@@ -152,7 +155,7 @@ fn local_vars(data: &Data) -> TokenStream {
 }
 
 fn ok_ident(ident: &Ident, data: &Data) -> TokenStream {
-    let fields = map_fields(data, |field| {
+    let fields = helper::map_fields(data, |field| {
         let field_ident = &field.ident;
 
         quote_spanned! {field.span()=>
@@ -164,18 +167,5 @@ fn ok_ident(ident: &Ident, data: &Data) -> TokenStream {
         Ok(#ident {
             #(#fields)*
         })
-    }
-}
-
-fn map_fields<'a>(
-    data: &'a Data,
-    f: impl Fn(&Field) -> TokenStream + 'a,
-) -> Box<dyn Iterator<Item = TokenStream> + 'a> {
-    match data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => Box::new(fields.named.iter().map(f)),
-            _ => todo!(),
-        },
-        _ => unimplemented!("only struct is supported"),
     }
 }
