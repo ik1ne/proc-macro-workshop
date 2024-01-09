@@ -1,12 +1,11 @@
 use proc_macro2::{Ident, TokenStream};
-use quote::__private::ext::RepToTokensExt;
-use quote::{format_ident, quote, quote_spanned};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::{
-    parse_macro_input, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments, Type,
-};
+use syn::{parse_macro_input, Data, DeriveInput, Field, Fields};
 
-#[proc_macro_derive(Builder)]
+mod helper;
+
+#[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -32,7 +31,7 @@ fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
 
     let ident_builder_fields = map_fields(data, |field| {
         let field_ident = &field.ident;
-
+        eprintln!("{:?}\n\n\n--", field.attrs.first().to_token_stream());
         quote_spanned! {field.span()=>
             #field_ident: None
         }
@@ -56,7 +55,7 @@ fn struct_ident_builder(ident: &Ident, data: &Data) -> TokenStream {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
-        if extract_option_type(field_ty).is_some() {
+        if helper::extract_option_type(field_ty).is_some() {
             quote_spanned! {field.span()=>
                 #field_ident: #field_ty
             }
@@ -95,7 +94,7 @@ fn impl_ident_builder_setter(data: &Data) -> TokenStream {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
-        if let Some(option_ty) = extract_option_type(field_ty) {
+        if let Some(option_ty) = helper::extract_option_type(field_ty) {
             quote_spanned! {field.span()=>
                 pub fn #field_ident(&mut self, #field_ident: #option_ty) -> &mut Self {
                     self.#field_ident = Some(#field_ident);
@@ -136,7 +135,7 @@ fn local_vars(data: &Data) -> TokenStream {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
-        if extract_option_type(field_ty).is_some() {
+        if helper::extract_option_type(field_ty).is_some() {
             quote_spanned! {field.span() =>
                 let #field_ident = self.#field_ident.take();
             }
@@ -179,27 +178,4 @@ fn map_fields<'a>(
         },
         _ => unimplemented!("only struct is supported"),
     }
-}
-
-fn extract_option_type(ty: &Type) -> Option<&Type> {
-    let Type::Path(path) = ty else {
-        return None;
-    };
-
-    let first_segment = path.path.segments.first()?;
-    if first_segment.ident != "Option" {
-        return None;
-    }
-
-    let first_argument = first_segment.arguments.next()?;
-    let PathArguments::AngleBracketed(first_angle_bracketed) = first_argument else {
-        return None;
-    };
-
-    let generic_arg = first_angle_bracketed.args.first()?;
-    let GenericArgument::Type(ty) = generic_arg else {
-        return None;
-    };
-
-    Some(ty)
 }
