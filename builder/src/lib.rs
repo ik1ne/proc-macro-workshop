@@ -1,7 +1,10 @@
-use proc_macro2::{Ident, TokenStream, TokenTree};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use proc_macro2::{Ident, TokenStream};
+use quote::__private::ext::RepToTokensExt;
+use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments, Type,
+};
 
 #[proc_macro_derive(Builder)]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -27,30 +30,19 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
     let ident_builder = format_ident!("{}Builder", ident);
 
-    let ident_builder_fields = match data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => {
-                let fields = fields.named.iter().map(|field| {
-                    let field_ident = &field.ident;
+    let ident_builder_fields = map_fields(data, |field| {
+        let field_ident = &field.ident;
 
-                    quote_spanned! {field.span()=>
-                        #field_ident: None,
-                    }
-                });
-                quote! {
-                    #(#fields)*
-                }
-            }
-            _ => todo!(),
-        },
-        _ => unimplemented!("only struct is supported"),
-    };
+        quote_spanned! {field.span()=>
+            #field_ident: None
+        }
+    });
 
     quote! {
         impl #ident {
             pub fn builder() -> #ident_builder {
                 #ident_builder {
-                    #ident_builder_fields
+                    #(#ident_builder_fields),*
                 }
             }
         }
@@ -60,42 +52,24 @@ fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
 fn struct_ident_builder(ident: &Ident, data: &Data) -> TokenStream {
     let ident_builder = format_ident!("{}Builder", ident);
 
-    let struct_fields = match data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => {
-                let fields = fields.named.iter().map(|field| {
-                    let field_ident = &field.ident;
-                    let field_type = &field.ty;
+    let struct_fields = map_fields(data, |field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
 
-                    quote_spanned! {field.span()=>
-                        #field_ident: Option<#field_type>
-                    }
-                });
-                quote! {
-                    #(#fields),*
-                }
+        if extract_option_type(field_ty).is_some() {
+            quote_spanned! {field.span()=>
+                #field_ident: #field_ty
             }
-            Fields::Unnamed(fields) => {
-                let fields = fields.unnamed.iter().enumerate().map(|(i, field)| {
-                    let field_ident = format_ident!("field_{}", i);
-                    let field_type = &field.ty;
-
-                    quote_spanned! {field.span() =>
-                        #field_ident: Option<#field_type>
-                    }
-                });
-                quote! {
-                    #(#fields),*
-                }
+        } else {
+            quote_spanned! {field.span()=>
+                  #field_ident: Option<#field_ty>
             }
-            Fields::Unit => quote! {},
-        },
-        _ => unimplemented!("only struct is supported"),
-    };
+        }
+    });
 
     quote! {
         struct #ident_builder {
-            #struct_fields
+            #(#struct_fields),*
         }
     }
 }
@@ -117,34 +91,29 @@ fn impl_ident_builder(ident: &Ident, data: &Data) -> TokenStream {
 }
 
 fn impl_ident_builder_setter(data: &Data) -> TokenStream {
-    let impl_body = match data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => {
-                let method = fields.named.iter().map(|field| {
-                    let field_ident = &field.ident;
-                    let field_ty = &field.ty;
+    let setters = map_fields(data, |field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
 
-                    quote_spanned! {field.span()=>
-                        pub fn #field_ident(&mut self, #field_ident: #field_ty) -> &mut Self {
-                            self.#field_ident = Some(#field_ident);
-                            self
-                        }
-                    }
-                });
-                quote! {
-                    #(#method)*
+        if let Some(option_ty) = extract_option_type(field_ty) {
+            quote_spanned! {field.span()=>
+                pub fn #field_ident(&mut self, #field_ident: #option_ty) -> &mut Self {
+                    self.#field_ident = Some(#field_ident);
+                    self
                 }
             }
-            Fields::Unnamed(_fields) => {
-                todo!()
+        } else {
+            quote_spanned! {field.span()=>
+                pub fn #field_ident(&mut self, #field_ident: #field_ty) -> &mut Self {
+                    self.#field_ident = Some(#field_ident);
+                    self
+                }
             }
-            Fields::Unit => quote! {},
-        },
-        _ => unimplemented!("only struct is supported"),
-    };
+        }
+    });
 
     quote! {
-            #impl_body
+        #(#setters)*
     }
 }
 
@@ -163,30 +132,20 @@ fn impl_ident_builder_build(ident: &Ident, data: &Data) -> TokenStream {
 }
 
 fn local_vars(data: &Data) -> TokenStream {
-    let lines = match data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => fields.named.iter().map(|field| {
-                let field_ident = &field.ident;
-                let field_ty = &field.ty;
-                let opt = field_ty
-                    .to_token_stream()
-                    .into_iter()
-                    .collect::<Vec<_>>()
-                    .swap_remove(0);
+    let lines = map_fields(data, |field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
 
-                if let TokenTree::Ident(ident) = opt {
-                    eprintln!("{}", ident == "Option");
-                };
-
-                quote_spanned! {field.span()=>
-                    let #field_ident = self.#field_ident.take().ok_or("#field_ident is required")?;
-                }
-            }),
-            Fields::Unnamed(_) => todo!(),
-            Fields::Unit => todo!(),
-        },
-        _ => unimplemented!("only struct is supported"),
-    };
+        if extract_option_type(field_ty).is_some() {
+            quote_spanned! {field.span() =>
+                let #field_ident = self.#field_ident.take();
+            }
+        } else {
+            quote_spanned! {field.span()=>
+                let #field_ident = self.#field_ident.take().ok_or("#field_ident is required")?;
+            }
+        }
+    });
 
     quote! {
         #(#lines)*
@@ -194,23 +153,53 @@ fn local_vars(data: &Data) -> TokenStream {
 }
 
 fn ok_ident(ident: &Ident, data: &Data) -> TokenStream {
-    let fields = match data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => fields.named.iter().map(|field| {
-                let field_ident = &field.ident;
+    let fields = map_fields(data, |field| {
+        let field_ident = &field.ident;
 
-                quote_spanned! {field.span()=>
-                    #field_ident,
-                }
-            }),
-            _ => todo!(),
-        },
-        _ => unimplemented!("only struct is supported"),
-    };
+        quote_spanned! {field.span()=>
+            #field_ident,
+        }
+    });
 
     quote! {
         Ok(#ident {
             #(#fields)*
         })
     }
+}
+
+fn map_fields<'a>(
+    data: &'a Data,
+    f: impl Fn(&Field) -> TokenStream + 'a,
+) -> Box<dyn Iterator<Item = TokenStream> + 'a> {
+    match data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => Box::new(fields.named.iter().map(f)),
+            _ => todo!(),
+        },
+        _ => unimplemented!("only struct is supported"),
+    }
+}
+
+fn extract_option_type(ty: &Type) -> Option<&Type> {
+    let Type::Path(path) = ty else {
+        return None;
+    };
+
+    let first_segment = path.path.segments.first()?;
+    if first_segment.ident != "Option" {
+        return None;
+    }
+
+    let first_argument = first_segment.arguments.next()?;
+    let PathArguments::AngleBracketed(first_angle_bracketed) = first_argument else {
+        return None;
+    };
+
+    let generic_arg = first_angle_bracketed.args.first()?;
+    let GenericArgument::Type(ty) = generic_arg else {
+        return None;
+    };
+
+    Some(ty)
 }
