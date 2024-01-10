@@ -65,8 +65,8 @@ pub fn get_each_from_builder_attribute(field: &Field) -> Result<Option<ExprLit>>
         return Ok(None);
     };
 
-    let tokens = builder_attr.to_token_stream();
-    let parsed_attr = syn::parse2::<BuilderAttr>(tokens)?;
+    let expr_tokens = builder_attr.parse_args::<Expr>()?.to_token_stream();
+    let parsed_attr = syn::parse2::<BuilderAttr>(expr_tokens)?;
 
     if parsed_attr.each_ident != "each" {
         panic!("only `each` is supported");

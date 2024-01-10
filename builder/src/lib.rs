@@ -1,8 +1,8 @@
 use crate::helper::get_each_from_builder_attribute;
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput};
+use syn::{parse_macro_input, Data, DeriveInput, ExprLit};
 
 mod helper;
 
@@ -33,10 +33,14 @@ fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
     let ident_builder_fields = helper::map_fields(data, |field| {
         let field_ident = &field.ident;
 
-        get_each_from_builder_attribute(field);
-
-        quote_spanned! {field.span()=>
-            #field_ident: None
+        if let Ok(Some(_)) = get_each_from_builder_attribute(field) {
+            quote_spanned! {field.span()=>
+                #field_ident: vec![],
+            }
+        } else {
+            quote_spanned! {field.span()=>
+                #field_ident: None
+            }
         }
     });
 
@@ -105,6 +109,13 @@ fn impl_ident_builder_setter(data: &Data) -> TokenStream {
                 }
             }
         } else {
+            if let Ok(Some(ExprLit { attrs, lit })) = get_each_from_builder_attribute(field) {
+                let a = eprintln!(
+                    "field_ident: {:?}",
+                    field_ident.as_ref().unwrap().to_string()
+                );
+            }
+
             quote_spanned! {field.span()=>
                 pub fn #field_ident(&mut self, #field_ident: #field_ty) -> &mut Self {
                     self.#field_ident = Some(#field_ident);
