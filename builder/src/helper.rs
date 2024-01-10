@@ -2,7 +2,8 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::parse::Parse;
 use syn::{
-    Data, Expr, ExprLit, Field, Fields, GenericArgument, Ident, PathArguments, Result, Token, Type,
+    Data, Expr, ExprLit, Field, Fields, GenericArgument, Ident, PathArguments, PathSegment, Result,
+    Token, Type,
 };
 
 pub fn map_fields<'a>(
@@ -77,4 +78,26 @@ pub fn get_each_from_builder_attribute(field: &Field) -> Result<Option<ExprLit>>
     };
 
     Ok(Some(lit))
+}
+
+pub fn ty_inside_vec(ty: &Type) -> Option<&Type> {
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
+
+    let PathSegment {
+        ident: _ident,
+        arguments: PathArguments::AngleBracketed(argument),
+    } = type_path.path.segments.first()?
+    else {
+        return None;
+    };
+
+    for argument in &argument.args {
+        if let GenericArgument::Type(ty) = argument {
+            return Some(ty);
+        }
+    }
+
+    None
 }

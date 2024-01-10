@@ -1,8 +1,9 @@
-use crate::helper::get_each_from_builder_attribute;
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, quote_spanned, ToTokens};
+use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, Data, DeriveInput, ExprLit, Lit};
+
+use crate::helper::{extract_option_type, get_each_from_builder_attribute, ty_inside_vec};
 
 mod helper;
 
@@ -35,7 +36,7 @@ fn impl_ident(ident: &Ident, data: &Data) -> TokenStream {
 
         if let Ok(Some(_)) = get_each_from_builder_attribute(field) {
             quote_spanned! {field.span()=>
-                #field_ident: vec![],
+                #field_ident: vec![]
             }
         } else {
             quote_spanned! {field.span()=>
@@ -62,7 +63,11 @@ fn struct_ident_builder(ident: &Ident, data: &Data) -> TokenStream {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
-        if helper::extract_option_type(field_ty).is_some() {
+        if extract_option_type(field_ty).is_some() {
+            quote_spanned! {field.span()=>
+                #field_ident: #field_ty
+            }
+        } else if let Ok(Some(_)) = get_each_from_builder_attribute(field) {
             quote_spanned! {field.span()=>
                 #field_ident: #field_ty
             }
@@ -101,7 +106,7 @@ fn impl_ident_builder_setter(data: &Data) -> TokenStream {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
-        if let Some(option_ty) = helper::extract_option_type(field_ty) {
+        if let Some(option_ty) = extract_option_type(field_ty) {
             quote_spanned! {field.span()=>
                 pub fn #field_ident(&mut self, #field_ident: #option_ty) -> &mut Self {
                     self.#field_ident = Some(#field_ident);
@@ -109,19 +114,20 @@ fn impl_ident_builder_setter(data: &Data) -> TokenStream {
                 }
             }
         } else {
-            if let Ok(Some(ExprLit { attrs, lit })) = get_each_from_builder_attribute(field) {
-                eprintln!(
-                    "field_ident: {:?}",
-                    field_ident.as_ref().unwrap().to_string()
-                );
-
-                eprintln!("attrs len: {}", attrs.len());
-
-                eprintln!("lit: {:?}", lit.to_token_stream());
-
-                if let Lit::Str(lit_str) = lit {
-                    eprintln!("lit_str: {:?}", lit_str.value());
-                    eprintln!("eq: {}", *field_ident.as_ref().unwrap() == lit_str.value());
+            if let Ok(Some(ExprLit {
+                lit: Lit::Str(lit_str),
+                ..
+            })) = get_each_from_builder_attribute(field)
+            {
+                if *field_ident.as_ref().unwrap() == lit_str.value() {
+                    return quote! {};
+                } else {
+                    return quote_spanned! {field.span()=>
+                        pub fn #field_ident(&mut self, #field_ident: #field_ty) -> &mut Self {
+                            self.#field_ident = #field_ident;
+                            self
+                        }
+                    };
                 }
             }
 
@@ -134,8 +140,34 @@ fn impl_ident_builder_setter(data: &Data) -> TokenStream {
         }
     });
 
+    let each_setters = helper::map_fields(data, |field| {
+        let field_ident = &field.ident;
+        let field_ty = &field.ty;
+
+        let Ok(Some(ExprLit {
+            lit: Lit::Str(lit_str),
+            ..
+        })) = get_each_from_builder_attribute(field)
+        else {
+            return quote! {};
+        };
+
+        let field_ty_inside_vec = ty_inside_vec(field_ty);
+
+        let fn_ident = format_ident!("{}", lit_str.value());
+
+        quote_spanned! {field.span()=>
+            pub fn #fn_ident(&mut self, val: #field_ty_inside_vec) -> &mut Self {
+                self.#field_ident.push(val);
+                self
+            }
+        }
+    });
+
     quote! {
         #(#setters)*
+
+        #(#each_setters)*
     }
 }
 
@@ -158,9 +190,13 @@ fn local_vars(data: &Data) -> TokenStream {
         let field_ident = &field.ident;
         let field_ty = &field.ty;
 
-        if helper::extract_option_type(field_ty).is_some() {
+        if extract_option_type(field_ty).is_some() {
             quote_spanned! {field.span() =>
                 let #field_ident = self.#field_ident.take();
+            }
+        } else if let Ok(Some(_)) = get_each_from_builder_attribute(field) {
+            quote_spanned! {field.span()=>
+                let #field_ident = self.#field_ident.drain(..).collect();
             }
         } else {
             quote_spanned! {field.span()=>
