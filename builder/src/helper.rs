@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::ToTokens;
 use syn::parse::Parse;
 use syn::{
     Data, Expr, ExprLit, Field, Fields, GenericArgument, Ident, PathArguments, Result, Token, Type,

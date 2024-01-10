@@ -1,8 +1,8 @@
 use crate::helper::get_each_from_builder_attribute;
 use proc_macro2::{Ident, TokenStream};
-use quote::{format_ident, quote, quote_spanned};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, ExprLit};
+use syn::{parse_macro_input, Data, DeriveInput, ExprLit, Lit};
 
 mod helper;
 
@@ -110,10 +110,19 @@ fn impl_ident_builder_setter(data: &Data) -> TokenStream {
             }
         } else {
             if let Ok(Some(ExprLit { attrs, lit })) = get_each_from_builder_attribute(field) {
-                let a = eprintln!(
+                eprintln!(
                     "field_ident: {:?}",
                     field_ident.as_ref().unwrap().to_string()
                 );
+
+                eprintln!("attrs len: {}", attrs.len());
+
+                eprintln!("lit: {:?}", lit.to_token_stream());
+
+                if let Lit::Str(lit_str) = lit {
+                    eprintln!("lit_str: {:?}", lit_str.value());
+                    eprintln!("eq: {}", *field_ident.as_ref().unwrap() == lit_str.value());
+                }
             }
 
             quote_spanned! {field.span()=>
