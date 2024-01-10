@@ -2,7 +2,10 @@ use proc_macro::TokenStream;
 
 use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericArgument, PathArguments, Type};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Expr, ExprAssign, Field, Fields, GenericArgument, Lit,
+    PathArguments, Type,
+};
 
 mod helper;
 
@@ -23,7 +26,7 @@ macro_rules! iterate_data_field {
                 Fields::Unnamed(fields) => {
                     for (i, $field) in fields.unnamed.iter().enumerate() {
                         {
-                            let $field_ident = format_ident!("field{}", i);
+                            let $field_ident = Some(format_ident!("field{}", i));
                             let $field_ty = &$field.ty;
 
                             $body
@@ -37,7 +40,7 @@ macro_rules! iterate_data_field {
     };
 }
 
-#[proc_macro_derive(Builder)]
+#[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -75,6 +78,12 @@ fn ident_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let mut ident_builder_fields_with_none = vec![];
 
     iterate_data_field!(input, fields, field, field_ident, _field_ty, {
+        if get_each_attr(field)?.is_some() {
+            ident_builder_fields_with_none.push(quote_spanned! {field.span()=>
+                #field_ident: vec![]
+            });
+            continue;
+        }
         ident_builder_fields_with_none.push(quote_spanned! {field.span()=>
             #field_ident: None
         });
@@ -103,6 +112,15 @@ fn ident_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 ///         self
 ///     }
 /// }
+///
+/// impl IdentBuilder {
+///     pub fn build(&mut self) -> Result<Ident, Box<dyn std::error::Error>> {
+///         Ok(Ident {
+///             field1: self.field1.take().ok_or("field is not set")?,
+///             field2: self.field2.take().ok_or("field is not set")?,
+///         })
+///     }
+/// }
 /// ```
 fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let ident = &input.ident;
@@ -111,7 +129,9 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
     let mut ident_builder_fields_with_ty = vec![];
 
     iterate_data_field!(input, fields, field, field_ident, field_ty, {
-        if get_option_inner_ty(field_ty)?.is_some() {
+        // 1. type is Option<T>
+        // 2. type has #[builder(each = "arg")] attribute
+        if get_option_inner_ty(field_ty)?.is_some() || get_each_attr(field)?.is_some() {
             ident_builder_fields_with_ty.push(quote_spanned! {field.span()=>
                 #field_ident: #field_ty
             });
@@ -125,6 +145,16 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
     let mut setter_methods = vec![];
 
     iterate_data_field!(input, fields, field, field_ident, field_ty, {
+        let each_attr_opt = get_each_attr(field)?;
+        let is_field_name_same_as_attr_name = if let (Some(field_ident), Some(each_attr_opt)) =
+            (field_ident.as_ref(), &each_attr_opt)
+        {
+            field_ident == each_attr_opt
+        } else {
+            false
+        };
+
+        // 1. type is Option<T>
         if let Some(inner_ty) = get_option_inner_ty(field_ty)? {
             setter_methods.push(quote_spanned! {field.span() =>
                 pub fn #field_ident(&mut self, #field_ident: #inner_ty) -> &mut Self {
@@ -132,7 +162,28 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
                     self
                 }
             });
+            continue;
+        } else if let Some(each_attr) = &each_attr_opt {
+            // 2. type has #[builder(each = "arg")] attribute, type is Vec<T>
+            let each_attr_ident = format_ident!("{}", each_attr);
+            // TODO replace #field_ty with inner type of Vec
+            setter_methods.push(quote_spanned! {field.span() =>
+                pub fn #each_attr_ident(&mut self, val: String) -> &mut Self {
+                    self.#field_ident.push(val);
+                    self
+                }
+            });
+
+            if !is_field_name_same_as_attr_name {
+                setter_methods.push(quote_spanned! {field.span() =>
+                    pub fn #field_ident(&mut self, val: #field_ty) -> &mut Self {
+                        self.#field_ident = val;
+                        self
+                    }
+                });
+            }
         } else {
+            // 3. type is T
             setter_methods.push(quote_spanned! {field.span() =>
                 pub fn #field_ident(&mut self, #field_ident: #field_ty) -> &mut Self {
                     self.#field_ident = Some(#field_ident);
@@ -145,7 +196,11 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
     let mut build_method_fields = vec![];
 
     iterate_data_field!(input, fields, field, field_ident, field_ty, {
-        if get_option_inner_ty(field_ty)?.is_some() {
+        if get_each_attr(field)?.is_some() {
+            build_method_fields.push(quote_spanned! {field.span() =>
+                #field_ident: self.#field_ident.drain(..).collect()
+            });
+        } else if get_option_inner_ty(field_ty)?.is_some() {
             build_method_fields.push(quote_spanned! {field.span() =>
                 #field_ident: self.#field_ident.take()
             });
@@ -212,4 +267,26 @@ fn get_option_inner_ty(ty: &Type) -> syn::Result<Option<&Type>> {
     };
 
     Ok(Some(arg))
+}
+
+fn get_each_attr(field: &Field) -> syn::Result<Option<String>> {
+    let Some(attribute) = field
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("builder"))
+    else {
+        return Ok(None);
+    };
+
+    let expr: ExprAssign = attribute.parse_args()?;
+
+    let Expr::Lit(lit) = expr.right.as_ref() else {
+        panic!("builder attribute must be literal");
+    };
+
+    let Lit::Str(lit_str) = &lit.lit else {
+        panic!("builder attribute must be string literal");
+    };
+
+    Ok(Some(lit_str.value()))
 }
