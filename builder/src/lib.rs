@@ -280,11 +280,26 @@ fn get_each_attr(field: &Field) -> syn::Result<Option<String>> {
 
     let expr: ExprAssign = attribute.parse_args()?;
 
-    let Expr::Lit(lit) = expr.right.as_ref() else {
+    let Expr::Path(path_left) = expr.left.as_ref() else {
         panic!("builder attribute must be literal");
     };
 
-    let Lit::Str(lit_str) = &lit.lit else {
+    if !path_left
+        .path
+        .get_ident()
+        .is_some_and(|ident| ident == "each")
+    {
+        return Err(syn::Error::new_spanned(
+            &attribute.meta,
+            r#"expected `builder(each = "...")`"#,
+        ));
+    }
+
+    let Expr::Lit(lit_right) = expr.right.as_ref() else {
+        panic!("builder attribute must be literal");
+    };
+
+    let Lit::Str(lit_str) = &lit_right.lit else {
         panic!("builder attribute must be string literal");
     };
 
