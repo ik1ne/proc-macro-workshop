@@ -85,7 +85,7 @@ fn ident_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             continue;
         }
         ident_builder_fields_with_none.push(quote_spanned! {field.span()=>
-            #field_ident: None
+            #field_ident: ::std::option::Option::None
         });
     });
 
@@ -137,7 +137,7 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
             });
         } else {
             ident_builder_fields_with_ty.push(quote_spanned! {field.span()=>
-                #field_ident: Option<#field_ty>
+                #field_ident: ::std::option::Option<#field_ty>
             });
         }
     });
@@ -158,7 +158,7 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
         if let Some(inner_ty) = get_option_inner_ty(field_ty)? {
             setter_methods.push(quote_spanned! {field.span() =>
                 pub fn #field_ident(&mut self, #field_ident: #inner_ty) -> &mut Self {
-                    self.#field_ident = Some(#field_ident);
+                    self.#field_ident = ::std::option::Option::Some(#field_ident);
                     self
                 }
             });
@@ -166,9 +166,9 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
         } else if let Some(each_attr) = &each_attr_opt {
             // 2. type has #[builder(each = "arg")] attribute, type is Vec<T>
             let each_attr_ident = format_ident!("{}", each_attr);
-            // TODO replace #field_ty with inner type of Vec
+            // TODO replace String with inner type of Vec
             setter_methods.push(quote_spanned! {field.span() =>
-                pub fn #each_attr_ident(&mut self, val: String) -> &mut Self {
+                pub fn #each_attr_ident(&mut self, val: std::string::String) -> &mut Self {
                     self.#field_ident.push(val);
                     self
                 }
@@ -221,7 +221,7 @@ fn builder_struct_impl(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStr
         }
 
         impl #ident_builder {
-            pub fn build(&mut self) -> Result<#ident, Box<dyn std::error::Error>> {
+            pub fn build(&mut self) -> ::std::result::Result<#ident, ::std::boxed::Box<dyn std::error::Error>> {
                 Ok(#ident {
                     #(#build_method_fields),*
                 })
