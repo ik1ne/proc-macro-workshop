@@ -1,5 +1,4 @@
 use proc_macro::TokenStream;
-use quote::quote;
 
 use syn::parse_macro_input;
 
@@ -9,7 +8,9 @@ mod seq;
 
 #[proc_macro]
 pub fn seq(input: TokenStream) -> TokenStream {
-    let _seq = parse_macro_input!(input as Seq);
+    let seq = parse_macro_input!(input as Seq);
 
-    TokenStream::from(quote! {})
+    seq.expand()
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
 }

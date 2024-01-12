@@ -1,3 +1,4 @@
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{Block, Ident, Lit, Token};
 
@@ -20,5 +21,11 @@ impl Parse for Seq {
             range_end: input.parse()?,
             body: input.parse()?,
         })
+    }
+}
+
+impl Seq {
+    pub(crate) fn expand(self) -> syn::Result<proc_macro2::TokenStream> {
+        Ok(quote!())
     }
 }
