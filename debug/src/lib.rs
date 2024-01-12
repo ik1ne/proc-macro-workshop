@@ -29,11 +29,14 @@ fn derive_inner(mut input: DeriveInput) -> syn::Result<proc_macro2::TokenStream>
     add_trait_bound(&mut input.generics, &input.data, span)?;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
+    let associated_types = associated_types(&input)?;
+
     Ok(quote! {
         impl #impl_generics ::std::fmt::Debug for #ident #ty_generics #where_clause {
             fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 fmt.debug_struct(stringify!(#ident))
                     #(#debug_fields)*
+                    #(#associated_types)*
                     .finish()
             }
         }
@@ -132,4 +135,21 @@ fn is_type_phantom_t(ty: &Type, t: &Ident) -> syn::Result<bool> {
     };
 
     Ok(arg.to_token_stream().to_string() == t.to_token_stream().to_string())
+}
+
+fn associated_types(input: &DeriveInput) -> syn::Result<Vec<proc_macro2::TokenStream>> {
+    let mut associated_types = vec![];
+
+    iterate_field(&input.data, input.span(), |field| {
+        let Type::Path(path) = &field.ty else {
+            panic! {};
+        };
+
+        let last_segment = path.path.segments.last().unwrap();
+        panic!("{:?}", last_segment.arguments.to_token_stream());
+
+        Ok(())
+    })?;
+
+    Ok(associated_types)
 }
