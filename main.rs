@@ -10,8 +10,8 @@ use std::str::FromStr;
 
 fn main() {
     let input = proc_macro2::TokenStream::from_str(
-        r#"pub struct Field {
-            name: &'static str,
+        r#"pub struct Field<T> {
+            value: T,
             #[debug = "0b{:08b}"]
             bitmask: u8,
         }"#,
