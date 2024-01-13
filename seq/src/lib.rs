@@ -2,9 +2,7 @@ use proc_macro::TokenStream;
 
 use syn::parse_macro_input;
 
-use crate::seq::Seq;
-
-mod seq;
+use seq_lib::Seq;
 
 #[proc_macro]
 pub fn seq(input: TokenStream) -> TokenStream {

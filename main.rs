@@ -8,15 +8,11 @@
 
 use quote::quote;
 
-use crate::seq::Seq;
-
-mod seq {
-    include!("seq/src/seq.rs");
-}
+use seq_lib::Seq;
 
 fn main() {
     let input: proc_macro2::TokenStream = quote! {
-        N in 0..16 {
+        N in 0..2 {
             #[derive(Copy, Clone, PartialEq, Debug)]
             enum Interrupt {
                 #(

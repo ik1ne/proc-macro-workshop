@@ -1,10 +1,10 @@
-use proc_macro2::{Group, Literal, Punct, TokenTree};
+use proc_macro2::{Group, Ident, Literal, Punct, TokenTree};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
-use syn::{braced, Ident, LitInt, Token};
+use syn::{braced, LitInt, Token};
 
-pub(crate) struct Seq {
+pub struct Seq {
     ident_repetition: Ident,
     _in: Token![in],
     range_begin: LitInt,
@@ -30,7 +30,7 @@ impl Parse for Seq {
 }
 
 impl Seq {
-    pub(crate) fn expand(self) -> syn::Result<proc_macro2::TokenStream> {
+    pub fn expand(self) -> syn::Result<proc_macro2::TokenStream> {
         let token_trees = self.body.into_iter().collect::<Vec<_>>();
 
         let mut result: Vec<TokenTree> = vec![];
