@@ -104,7 +104,8 @@ pub(crate) fn try_combine_tilde_ident(
         1,
     );
     let new_ident_string = format!("{}{}", first_ident, new_second_ident_string);
-    let new_ident = Ident::new(&new_ident_string, second_ident.span());
+    let mut new_ident = Ident::new(&new_ident_string, second_ident.span());
+    new_ident.set_span(first_ident.span());
 
     Some(new_ident)
 }
