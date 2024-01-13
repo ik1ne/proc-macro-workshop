@@ -12,6 +12,7 @@ pub struct Seq {
     _in: Token![in],
     range_begin: LitInt,
     _dot_dot: Token![..],
+    eq: Option<Token![=]>,
     range_end: LitInt,
     _brace_token: Brace,
     body: proc_macro2::TokenStream,
@@ -25,6 +26,7 @@ impl Parse for Seq {
             _in: input.parse()?,
             range_begin: input.parse()?,
             _dot_dot: input.parse()?,
+            eq: input.parse()?,
             range_end: input.parse()?,
             _brace_token: braced!(content in input),
             body: content.parse()?,
@@ -36,8 +38,15 @@ impl Seq {
     pub fn expand(self) -> syn::Result<proc_macro2::TokenStream> {
         let token_trees = self.body.into_iter().collect::<Vec<_>>();
         let is_tag_repetition = contains_repetition_tag(&token_trees);
-        let range =
-            self.range_begin.base10_parse::<usize>()?..self.range_end.base10_parse::<usize>()?;
+        let range_begin = self.range_begin.base10_parse()?;
+        let range_end = self.range_end.base10_parse()?;
+
+        let range = if self.eq.is_some() {
+            // This should have been range_begin..=range_end, but .. and ..= are two separate types and I am lazy.
+            range_begin..(range_end + 1)
+        } else {
+            range_begin..range_end
+        };
 
         let mut result: Vec<TokenTree> = vec![];
 
