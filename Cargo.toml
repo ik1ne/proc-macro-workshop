@@ -24,6 +24,8 @@ proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
 
+derive_debug = { path = "debug" }
+
 seq_lib = { path = "seq_lib" }
 debug_lib = { path = "debug_lib" }
 
