@@ -1,5 +1,5 @@
 use proc_macro2::{Delimiter, Ident, TokenTree};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
 use syn::{braced, LitInt, Token};
@@ -56,29 +56,35 @@ impl Seq {
 
 fn contains_repetition_tag(body: &[TokenTree]) -> bool {
     for (i, token) in body.iter().enumerate() {
-        match token {
-            TokenTree::Group(group) => {
-                let group_tokens = group.stream().into_iter().collect::<Vec<_>>();
-                if contains_repetition_tag(&group_tokens) {
-                    return true;
-                }
+        if parse_repetition_group(body, i).is_some() {
+            return true;
+        }
+
+        if let TokenTree::Group(group) = token {
+            let group_tokens = group.stream().into_iter().collect::<Vec<_>>();
+            if contains_repetition_tag(&group_tokens) {
+                return true;
             }
-            TokenTree::Punct(punct) => {
-                // i is '#', i + 1 is parentheses group,
-                if punct.as_char() == '#'
-                    && matches!(body.get(i + 1), Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis)
-                {
-                    // i + 2 is '*'
-                    if let Some(TokenTree::Punct(punct)) = body.get(i + 2) {
-                        if punct.as_char() == '*' {
-                            return true;
-                        }
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
     false
+}
+
+pub(crate) fn parse_repetition_group(body: &[TokenTree], i: usize) -> Option<&proc_macro2::Group> {
+    if !matches!(body.get(i), Some(TokenTree::Punct(punct)) if punct.as_char() == '#')
+        || !matches!(body.get(i + 2), Some(TokenTree::Punct(punct)) if punct.as_char() == '*')
+    {
+        return None;
+    }
+
+    let Some(TokenTree::Group(group)) = body.get(i + 1) else {
+        return None;
+    };
+
+    if group.delimiter() != Delimiter::Parenthesis {
+        return None;
+    }
+
+    Some(group)
 }

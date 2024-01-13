@@ -75,7 +75,7 @@ impl Seq {
     }
 }
 
-pub fn try_combine_tilde_ident(
+pub(crate) fn try_combine_tilde_ident(
     tokens: &[TokenTree],
     i: usize,
     ident_repetition: &Ident,
