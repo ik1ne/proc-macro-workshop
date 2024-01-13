@@ -15,13 +15,16 @@ mod seq {
 }
 
 fn main() {
-    let input: proc_macro2::TokenStream = quote!(
-       N in 1..4 {
-            fn f~N_asdf () -> u64 {
-                N * 2
+    let input: proc_macro2::TokenStream = quote! {
+        N in 0..16 {
+            #[derive(Copy, Clone, PartialEq, Debug)]
+            enum Interrupt {
+                #(
+                    Irq~N,
+                )
             }
         }
-    );
+    };
 
     let result = syn::parse2::<Seq>(input).unwrap().expand().unwrap();
 

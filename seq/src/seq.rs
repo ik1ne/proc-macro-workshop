@@ -31,30 +31,15 @@ impl Parse for Seq {
 
 impl Seq {
     pub(crate) fn expand(self) -> syn::Result<proc_macro2::TokenStream> {
-        let range = self.range_begin()?..self.range_end()?;
         let token_trees = self.body.into_iter().collect::<Vec<_>>();
 
         let mut result: Vec<TokenTree> = vec![];
-        for i in range {
+        for i in self.range_begin.base10_parse()?..self.range_end.base10_parse()? {
             Seq::expand_once(&mut result, &token_trees, &self.ident_repetition, i)?;
         }
 
         let result: proc_macro2::TokenStream = result.into_iter().collect();
         Ok(quote! { #result })
-    }
-
-    fn range_begin(&self) -> syn::Result<usize> {
-        self.range_begin
-            .to_string()
-            .parse()
-            .map_err(|_| syn::Error::new_spanned(&self.range_begin, "expected integer literal"))
-    }
-
-    fn range_end(&self) -> syn::Result<usize> {
-        self.range_end
-            .to_string()
-            .parse()
-            .map_err(|_| syn::Error::new_spanned(&self.range_end, "expected integer literal"))
     }
 
     fn expand_once(
