@@ -66,8 +66,7 @@ impl Seq {
         let mut i = 0;
 
         while i < tokens.len() {
-            let fed =
-                Seq::expand_single_token(result, tokens, i, ident_repetition, repetition_index)?;
+            let fed = Seq::expand_ith_token(result, tokens, i, ident_repetition, repetition_index)?;
             if fed == 0 {
                 panic!("fed 0 tokens");
             }
@@ -78,7 +77,7 @@ impl Seq {
         Ok(())
     }
 
-    fn expand_single_token(
+    fn expand_ith_token(
         result: &mut Vec<TokenTree>,
         tokens: &[TokenTree],
         i: usize,
