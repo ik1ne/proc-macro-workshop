@@ -1,8 +1,11 @@
-use proc_macro2::{Group, Ident, Literal, Punct, TokenTree};
-use quote::quote;
+use proc_macro2::{Delimiter, Ident, TokenTree};
+use quote::{quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::token::Brace;
 use syn::{braced, LitInt, Token};
+
+mod simple_repetition;
+mod tag_repetition;
 
 pub struct Seq {
     ident_repetition: Ident,
@@ -32,128 +35,50 @@ impl Parse for Seq {
 impl Seq {
     pub fn expand(self) -> syn::Result<proc_macro2::TokenStream> {
         let token_trees = self.body.into_iter().collect::<Vec<_>>();
+        let is_tag_repetition = contains_repetition_tag(&token_trees);
+        let range =
+            self.range_begin.base10_parse::<usize>()?..self.range_end.base10_parse::<usize>()?;
 
         let mut result: Vec<TokenTree> = vec![];
-        for i in self.range_begin.base10_parse()?..self.range_end.base10_parse()? {
-            Seq::expand_once(&mut result, &token_trees, &self.ident_repetition, i)?;
-        }
+
+        if is_tag_repetition {
+            Seq::expand_tag_repetition(&mut result, &token_trees, &self.ident_repetition, range)?;
+        } else {
+            for i in range {
+                Seq::expand_simple_once(&mut result, &token_trees, &self.ident_repetition, i)?;
+            }
+        };
 
         let result: proc_macro2::TokenStream = result.into_iter().collect();
         Ok(quote! { #result })
     }
+}
 
-    fn expand_once(
-        result: &mut Vec<TokenTree>,
-        tokens: &[TokenTree],
-        ident_repetition: &Ident,
-        repetition_index: usize,
-    ) -> syn::Result<()> {
-        let mut i = 0;
-
-        while i < tokens.len() {
-            let fed = Seq::expand_ith_token(result, tokens, i, ident_repetition, repetition_index)?;
-            if fed == 0 {
-                panic!("fed 0 tokens");
-            }
-
-            i += fed;
-        }
-
-        Ok(())
-    }
-
-    fn expand_ith_token(
-        result: &mut Vec<TokenTree>,
-        tokens: &[TokenTree],
-        i: usize,
-        ident_repetition: &Ident,
-        repetition_index: usize,
-    ) -> syn::Result<usize> {
-        match &tokens[i] {
+fn contains_repetition_tag(body: &[TokenTree]) -> bool {
+    for (i, token) in body.iter().enumerate() {
+        match token {
             TokenTree::Group(group) => {
-                let mut group_inner = vec![];
-                let group_token_stream = group.stream().into_iter().collect::<Vec<_>>();
-                Seq::expand_once(
-                    &mut group_inner,
-                    &group_token_stream,
-                    ident_repetition,
-                    repetition_index,
-                )?;
-                let mut new_group =
-                    Group::new(group.delimiter(), group_inner.into_iter().collect());
-
-                new_group.set_span(group.span());
-
-                result.push(TokenTree::Group(new_group));
+                let group_tokens = group.stream().into_iter().collect::<Vec<_>>();
+                if contains_repetition_tag(&group_tokens) {
+                    return true;
+                }
             }
-            TokenTree::Ident(ident) => {
-                if let Some(new_ident) =
-                    try_combine_tilde_ident(tokens, i, ident_repetition, repetition_index)
+            TokenTree::Punct(punct) => {
+                // i is '#', i + 1 is parentheses group,
+                if punct.as_char() == '#'
+                    && matches!(body.get(i + 1), Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Parenthesis)
                 {
-                    result.push(TokenTree::Ident(new_ident));
-                    return Ok(3);
-                }
-                if *ident != *ident_repetition {
-                    result.push(TokenTree::Ident(ident.clone()));
-                } else {
-                    let mut literal = Literal::usize_unsuffixed(repetition_index);
-                    literal.set_span(ident.span());
-                    result.push(TokenTree::Literal(literal));
+                    // i + 2 is '*'
+                    if let Some(TokenTree::Punct(punct)) = body.get(i + 2) {
+                        if punct.as_char() == '*' {
+                            return true;
+                        }
+                    }
                 }
             }
-            TokenTree::Punct(punct) => result.push(TokenTree::Punct(punct.clone())),
-
-            TokenTree::Literal(literal) => result.push(TokenTree::Literal(literal.clone())),
+            _ => {}
         }
-
-        Ok(1)
-    }
-}
-
-fn try_combine_tilde_ident(
-    tokens: &[TokenTree],
-    i: usize,
-    ident_repetition: &Ident,
-    repetition_index: usize,
-) -> Option<Ident> {
-    let first_ident = get_ith_ident(tokens, i)?;
-    let ith_punct = get_ith_punct(tokens, i + 1)?;
-    if ith_punct.as_char() != '~' {
-        return None;
     }
 
-    let second_ident = get_ith_ident(tokens, i + 2)?;
-
-    let ident_repetition_string = ident_repetition.to_string();
-
-    if !second_ident
-        .to_string()
-        .starts_with(&ident_repetition_string)
-    {
-        return None;
-    }
-
-    let new_second_ident_string = second_ident.to_string().replacen(
-        &ident_repetition_string,
-        &repetition_index.to_string(),
-        1,
-    );
-    let new_ident_string = format!("{}{}", first_ident, new_second_ident_string);
-    let new_ident = Ident::new(&new_ident_string, second_ident.span());
-
-    Some(new_ident)
-}
-
-fn get_ith_ident(tokens: &[TokenTree], i: usize) -> Option<&Ident> {
-    match &tokens.get(i)? {
-        TokenTree::Ident(ident) => Some(ident),
-        _ => None,
-    }
-}
-
-fn get_ith_punct(tokens: &[TokenTree], i: usize) -> Option<&Punct> {
-    match &tokens.get(i)? {
-        TokenTree::Punct(punct) => Some(punct),
-        _ => None,
-    }
+    false
 }
