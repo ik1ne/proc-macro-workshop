@@ -35,7 +35,21 @@ fn impl_debug_for(item_struct: &ItemStruct) -> syn::Result<proc_macro2::TokenStr
 fn debug_field(field: &syn::Field) -> syn::Result<proc_macro2::TokenStream> {
     let name = field.ident.as_ref().unwrap();
 
-    Ok(quote! {
-        .field(stringify!(#name), &self.#name)
-    })
+    let debug_expr_assign = field
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("debug"));
+
+    if let Some(debug_expr_assign) = debug_expr_assign {
+        let name_value = debug_expr_assign.meta.require_name_value()?;
+        let value = &name_value.value;
+
+        Ok(quote! {
+            .field(stringify!(#name), &::std::format_args!(#value, &self.#name))
+        })
+    } else {
+        Ok(quote! {
+            .field(stringify!(#name), &self.#name)
+        })
+    }
 }

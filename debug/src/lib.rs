@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(CustomDebug)]
+#[proc_macro_derive(CustomDebug, attributes(debug))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = proc_macro2::TokenStream::from(input);
 
