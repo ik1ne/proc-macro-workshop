@@ -6,55 +6,38 @@
 // To run the code:
 //     $ cargo run
 
-// use derive_builder::Builder;
-//
-// #[derive(Builder)]
-// pub struct Command {
-//     executable: String,
-//     #[builder(eac = "arg")]
-//     args: Vec<String>,
-//     env: Vec<String>,
-//     current_dir: Option<String>,
-// }
+use std::str::FromStr;
 
-use quote::ToTokens;
-use syn::{parse_quote, Expr, ExprAssign, Field, Lit};
+use seq_lib::Seq;
 
 fn main() {
-    let incorrect_field: Field = parse_quote! {
-        #[builder(eac = "arg")]
-        args: Vec<String>
-    };
+    let input_simple = proc_macro2::TokenStream::from_str(
+        "N in 1..4 {
+            fn f~N () -> u64 {
+                N * 2
+            }
+        }",
+    )
+    .unwrap();
 
-    get_each_attr(&incorrect_field).unwrap();
-}
+    let _simple_result = syn::parse2::<Seq>(input_simple).unwrap().expand().unwrap();
 
-fn get_each_attr(field: &Field) -> syn::Result<Option<String>> {
-    let Some(attribute) = field
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("builder"))
-    else {
-        return Ok(None);
-    };
+    let input_repetition: proc_macro2::TokenStream = proc_macro2::TokenStream::from_str(
+        "N in 0..2 {
+            #[derive(Copy, Clone, PartialEq, Debug)]
+            enum Interrupt {
+                #(
+                    Irq~N,
+                )*
+            }
+        }",
+    )
+    .unwrap();
 
-    let expr: ExprAssign = attribute.parse_args()?;
+    let result = syn::parse2::<Seq>(input_repetition)
+        .unwrap()
+        .expand()
+        .unwrap();
 
-    eprintln!("{:?}", expr.left.as_ref().to_token_stream());
-
-    let Expr::Path(path_left) = expr.left.as_ref() else {
-        panic!("builder attribute must be literal");
-    };
-
-    panic!("{:?}", path_left.path.to_token_stream());
-
-    let Expr::Lit(lit_right) = expr.right.as_ref() else {
-        panic!("builder attribute must be literal");
-    };
-
-    let Lit::Str(lit_str) = &lit_right.lit else {
-        panic!("builder attribute must be string literal");
-    };
-
-    Ok(Some(lit_str.value()))
+    println!("{}", result);
 }

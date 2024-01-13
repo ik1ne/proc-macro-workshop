@@ -5,17 +5,27 @@ edition = "2021"
 publish = false
 
 [workspace]
+members = [
+    "bitfield",
+    "builder",
+    "debug",
+    "seq",
+    "seq_lib",
+    "sorted",
+]
 
 [[bin]]
 name = "workshop"
 path = "main.rs"
 
 [dependencies]
-bitfield = { path = "bitfield" }
-derive_builder = { path = "builder" }
-derive_debug = { path = "debug" }
-seq = { path = "seq" }
-sorted = { path = "sorted" }
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }
+
+seq_lib = { path = "seq_lib" }
+
+[workspace.dependencies]
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
