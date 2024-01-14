@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use syn::visit_mut::VisitMut;
 use syn::{Arm, ExprMatch, Pat, Path};
 
@@ -37,13 +38,13 @@ impl MatchCheckReplace {
             .map(|arm| get_string_from_pat(&arm.pat).map(|s| (arm, s)))
             .collect::<syn::Result<Vec<_>>>()?;
 
-        sorted_arms.sort_by_cached_key(|entry| entry.1.clone());
+        sorted_arms.sort_by(|l, r| l.1.cmp(&r.1));
 
         for ((sorted_arm, sorted_arm_s), arm) in sorted_arms.iter().zip(arms.iter()) {
             let arm_s = get_string_from_pat(&arm.pat).expect("second iteration failed");
 
             if &arm_s != sorted_arm_s {
-                let msg = format!("{} should sort before {}", sorted_arm_s, arm_s);
+                let msg = format!("{} should sort before {}", sorted_arm_s.0, arm_s.0);
 
                 let error = syn::Error::new_spanned(get_path_from_pat(&sorted_arm.pat), msg);
 
@@ -55,15 +56,40 @@ impl MatchCheckReplace {
     }
 }
 
-fn get_string_from_pat(pat: &Pat) -> syn::Result<String> {
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct PatString(pub String);
+
+impl PartialOrd<Self> for PatString {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PatString {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.0.starts_with('_') {
+            Ordering::Greater
+        } else if other.0.starts_with('_') {
+            Ordering::Less
+        } else {
+            self.0.cmp(&other.0)
+        }
+    }
+}
+
+fn get_string_from_pat(pat: &Pat) -> syn::Result<PatString> {
     match pat {
-        Pat::TupleStruct(tuple_struct) => Ok(tuple_struct
-            .path
-            .segments
-            .iter()
-            .map(|segment| segment.ident.to_string())
-            .collect::<Vec<_>>()
-            .join("::")),
+        Pat::TupleStruct(tuple_struct) => Ok(PatString(
+            tuple_struct
+                .path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect::<Vec<_>>()
+                .join("::"),
+        )),
+        Pat::Ident(ident) => Ok(PatString(ident.ident.to_string())),
+        Pat::Wild(_) => Ok(PatString("_".to_string())),
         _ => Err(syn::Error::new_spanned(pat, "unsupported by #[sorted]")),
     }
 }
