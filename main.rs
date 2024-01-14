@@ -2,14 +2,16 @@ use quote::quote;
 
 fn main() {
     let input = quote! {
-        pub enum Error {
-            Fmt(fmt::Error),
-            Io(io::Error),
-            Utf8(Utf8Error),
-            Var(VarError),
-            Dyn(Box<dyn StdError>),
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            use self::Error::*;
+
+            #[sorted]
+            match self {
+                Io(e) => write!(f, "{}", e),
+                Fmt(e) => write!(f, "{}", e),
+            }
         }
     };
 
-    println!("{}", sorted_lib::derive(quote! {}, input).unwrap());
+    println!("{}", sorted_lib::check::derive(quote! {}, input).unwrap());
 }
