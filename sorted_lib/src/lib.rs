@@ -7,21 +7,21 @@ pub fn derive(
 ) -> syn::Result<proc_macro2::TokenStream> {
     let item: Item = syn::parse2(input)?;
 
-    match &item {
-        Item::Enum(item_enum) => {
-            check_enum_sorted(item_enum)?;
-        }
-        _ => {
-            return Err(syn::Error::new(
-                proc_macro2::Span::call_site(),
-                "expected enum or match expression",
-            ))
-        }
+    let result = match &item {
+        Item::Enum(item_enum) => check_enum_sorted(item_enum),
+        _ => Err(syn::Error::new(
+            proc_macro2::Span::call_site(),
+            "expected enum or match expression",
+        )),
     };
 
-    Ok(quote! {
-        #item
-    })
+    match result {
+        Ok(_) => Ok(quote! { #item }),
+        Err(err) => {
+            let err = err.to_compile_error();
+            Ok(quote! { #item #err })
+        }
+    }
 }
 
 fn check_enum_sorted(item_enum: &ItemEnum) -> syn::Result<()> {

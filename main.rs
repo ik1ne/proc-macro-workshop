@@ -2,12 +2,12 @@ use quote::quote;
 
 fn main() {
     let input = quote! {
-        pub enum Conference {
-            RustBeltRust,
-            RustConf,
-            RustFest,
-            RustLatam,
-            RustRush,
+        pub enum Error {
+            Fmt(fmt::Error),
+            Io(io::Error),
+            Utf8(Utf8Error),
+            Var(VarError),
+            Dyn(Box<dyn StdError>),
         }
     };
 
