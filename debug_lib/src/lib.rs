@@ -1,10 +1,12 @@
+use std::slice::Iter;
+
 use proc_macro2::Ident;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parse_quote, Field, Fields, GenericArgument, GenericParam, Generics, ItemStruct, PathArguments,
-    Type, TypePath, WhereClause,
+    parse_quote, Attribute, Expr, ExprAssign, Field, Fields, GenericArgument, GenericParam,
+    Generics, ItemStruct, Lit, PathArguments, Type, TypePath, WhereClause, WherePredicate,
 };
 
 pub fn derive(input: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
@@ -25,9 +27,17 @@ fn impl_debug_for(item_struct: &mut ItemStruct) -> syn::Result<proc_macro2::Toke
         &item_struct.fields,
     );
 
-    add_trait_bounds(&mut item_struct.generics, &item_struct.fields);
+    add_trait_bounds(
+        &mut item_struct.generics,
+        item_struct.attrs.iter(),
+        &item_struct.fields,
+    );
 
-    let (impl_generics, type_generics, where_clause) = item_struct.generics.split_for_impl();
+    if let Some(custom_bound) = get_custom_bound(item_struct.attrs.iter())? {
+        add_custom_bounds(custom_bound, &mut item_struct.generics);
+    }
+
+    let (impl_generics, type_generics, mut where_clause) = item_struct.generics.split_for_impl();
 
     // vector of `.field("bar", &self.bar)` as proc_macro2::TokenStream
     let field_adds = item_struct
@@ -48,7 +58,8 @@ fn impl_debug_for(item_struct: &mut ItemStruct) -> syn::Result<proc_macro2::Toke
     })
 }
 
-fn add_trait_bounds(generics: &mut Generics, fields: &Fields) {
+fn add_trait_bounds(generics: &mut Generics, attrs: Iter<Attribute>, fields: &Fields) {
+    let custom_bound = get_custom_bound(attrs).unwrap();
     let associated_types = fields
         .iter()
         .filter_map(|field| {
@@ -65,6 +76,13 @@ fn add_trait_bounds(generics: &mut Generics, fields: &Fields) {
         if let GenericParam::Type(ty) = param {
             let ident = &ty.ident;
             if is_ident_inside_phantom_data(ident, fields) {
+                continue;
+            }
+
+            if custom_bound
+                .as_ref()
+                .is_some_and(|bound| bound.starts_with(ident.to_string().as_str()))
+            {
                 continue;
             }
 
@@ -180,4 +198,40 @@ fn get_associated_type_paths<'a>(
     }
 
     result
+}
+
+fn add_custom_bounds(custom_bound: String, generics: &mut Generics) {
+    let where_clause = generics
+        .where_clause
+        .get_or_insert_with(|| parse_quote! { where });
+
+    let where_predicate: WherePredicate = syn::parse_str(&custom_bound).unwrap();
+
+    where_clause.predicates.push(where_predicate);
+}
+
+fn get_custom_bound<'a>(
+    mut attrs: impl Iterator<Item = &'a Attribute>,
+) -> syn::Result<Option<String>> {
+    let Some(attribute) = attrs.find(|attr| attr.path().is_ident("debug")) else {
+        return Ok(None);
+    };
+
+    let expr_assign: ExprAssign = attribute.parse_args()?;
+
+    let Expr::Lit(lit) = &*expr_assign.right else {
+        return Err(syn::Error::new_spanned(
+            expr_assign.right,
+            "debug attribute must be literal",
+        ));
+    };
+
+    let Lit::Str(lit_str) = &lit.lit else {
+        return Err(syn::Error::new_spanned(
+            lit,
+            "debug attribute must be literal",
+        ));
+    };
+
+    Ok(Some(lit_str.value()))
 }
