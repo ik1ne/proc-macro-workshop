@@ -9,6 +9,7 @@ members = [
     "bitfield",
     "builder",
     "debug",
+    "debug_lib",
     "seq",
     "seq_lib",
     "sorted",
@@ -23,7 +24,10 @@ proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
 
+derive_debug = { path = "debug" }
+
 seq_lib = { path = "seq_lib" }
+debug_lib = { path = "debug_lib" }
 
 [workspace.dependencies]
 proc-macro2 = "1"
