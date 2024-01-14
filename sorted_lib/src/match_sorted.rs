@@ -51,11 +51,10 @@ fn get_string_from_pat(pat: &Pat) -> String {
         Pat::TupleStruct(tuple_struct) => tuple_struct
             .path
             .segments
-            .last()
-            .as_ref()
-            .unwrap()
-            .ident
-            .to_string(),
+            .iter()
+            .map(|segment| segment.ident.to_string())
+            .collect::<Vec<_>>()
+            .join("::"),
         _ => unimplemented!("get_string_from_pat is only implemented for Pat::TupleStruct"),
     }
 }
