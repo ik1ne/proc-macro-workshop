@@ -13,6 +13,7 @@ members = [
     "seq",
     "seq_lib",
     "sorted",
+    "sorted_lib",
 ]
 
 [[bin]]
@@ -26,8 +27,9 @@ syn = { version = "2", features = ["full"] }
 
 derive_debug = { path = "debug" }
 
-seq_lib = { path = "seq_lib" }
 debug_lib = { path = "debug_lib" }
+seq_lib = { path = "seq_lib" }
+sorted_lib = { path = "sorted_lib" }
 
 [workspace.dependencies]
 proc-macro2 = "1"

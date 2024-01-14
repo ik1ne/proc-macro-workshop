@@ -1,13 +1,18 @@
-use std::str::FromStr;
+use quote::quote;
 
 fn main() {
-    let input = proc_macro2::TokenStream::from_str(
-        r#"#[debug(bound = "T::Value: Debug")]
-        pub struct Wrapper<T: Trait> {
-            field: Field<T>,
-        }"#,
-    )
-    .unwrap();
+    let input = quote! {
+        pub fn region(&self) -> &str {
+        use self::Conference::*;
 
-    println!("{}", debug_lib::derive(input).unwrap());
+        #[sorted]
+        match self {
+            RustFest => "Europe",
+            RustLatam => "Latin America",
+            _ => "elsewhere",
+        }
+    }
+    };
+
+    println!("{}", sorted_lib::check::derive(quote! {}, input).unwrap());
 }
