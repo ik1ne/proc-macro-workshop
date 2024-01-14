@@ -23,39 +23,48 @@ impl VisitMut for MatchCheckReplace {
 }
 
 impl MatchCheckReplace {
-    pub(crate) fn check_match_arms(&mut self, arms: &[Arm]) {
-        let mut sorted_arms = arms.iter().collect::<Vec<_>>();
+    fn check_match_arms(&mut self, arms: &[Arm]) {
+        let result = self.check_match_arms_inner(arms);
 
-        // yes, this is inefficient. I should've used Vec<&Arm, String> instead but I'm lazy
-        sorted_arms.sort_by_key(|arm| get_string_from_pat(&arm.pat));
+        if let Err(err) = result {
+            self.first_error = Some(err);
+        }
+    }
 
-        for (sorted_arm, arm) in sorted_arms.iter().zip(arms.iter()) {
-            let arm_id = get_string_from_pat(&arm.pat);
+    fn check_match_arms_inner(&mut self, arms: &[Arm]) -> syn::Result<()> {
+        let mut sorted_arms = arms
+            .iter()
+            .map(|arm| get_string_from_pat(&arm.pat).map(|s| (arm, s)))
+            .collect::<syn::Result<Vec<_>>>()?;
 
-            let sorted_arm_id = get_string_from_pat(&sorted_arm.pat);
+        sorted_arms.sort_by_cached_key(|entry| entry.1.clone());
 
-            if arm_id != sorted_arm_id {
-                let msg = format!("{} should sort before {}", sorted_arm_id, arm_id);
+        for ((sorted_arm, sorted_arm_s), arm) in sorted_arms.iter().zip(arms.iter()) {
+            let arm_s = get_string_from_pat(&arm.pat).expect("second iteration failed");
+
+            if &arm_s != sorted_arm_s {
+                let msg = format!("{} should sort before {}", sorted_arm_s, arm_s);
 
                 let error = syn::Error::new_spanned(get_path_from_pat(&sorted_arm.pat), msg);
 
-                self.first_error = Some(error);
-                return;
+                return Err(error);
             }
         }
+
+        Ok(())
     }
 }
 
-fn get_string_from_pat(pat: &Pat) -> String {
+fn get_string_from_pat(pat: &Pat) -> syn::Result<String> {
     match pat {
-        Pat::TupleStruct(tuple_struct) => tuple_struct
+        Pat::TupleStruct(tuple_struct) => Ok(tuple_struct
             .path
             .segments
             .iter()
             .map(|segment| segment.ident.to_string())
             .collect::<Vec<_>>()
-            .join("::"),
-        _ => unimplemented!("get_string_from_pat is only implemented for Pat::TupleStruct"),
+            .join("::")),
+        _ => Err(syn::Error::new_spanned(pat, "unsupported by #[sorted]")),
     }
 }
 
