@@ -1,7 +1,7 @@
 use std::slice::Iter;
 
 use proc_macro2::Ident;
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
@@ -37,7 +37,7 @@ fn impl_debug_for(item_struct: &mut ItemStruct) -> syn::Result<proc_macro2::Toke
         add_custom_bounds(custom_bound, &mut item_struct.generics);
     }
 
-    let (impl_generics, type_generics, mut where_clause) = item_struct.generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = item_struct.generics.split_for_impl();
 
     // vector of `.field("bar", &self.bar)` as proc_macro2::TokenStream
     let field_adds = item_struct
