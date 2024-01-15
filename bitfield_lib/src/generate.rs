@@ -29,13 +29,13 @@ fn generate_token_stream_for_bitfield_type(i: usize) -> proc_macro2::TokenStream
                     let bit_offset_in_byte = bit_offset % 8;
                     let bits_to_read = ::core::cmp::min(remaining_len, 8 - bit_offset_in_byte);
 
-                    let byte = arr[byte_offset];
-                    let byte = byte << bit_offset_in_byte;
-                    let byte = byte >> (8 - bits_to_read);
+                    let mut byte = arr[byte_offset];
+                    byte <<= bit_offset_in_byte;
+                    byte >>= (8 - bits_to_read);
                     let byte = byte as u64;
 
-                    value = value << bits_to_read;
-                    value = value | byte;
+                    value <<= bits_to_read;
+                    value |= byte;
 
                     remaining_len -= bits_to_read;
                     bit_offset += bits_to_read;
@@ -58,10 +58,10 @@ fn generate_token_stream_for_bitfield_type(i: usize) -> proc_macro2::TokenStream
                     let bits_to_write = ::core::cmp::min(remaining_len, 8 - bit_offset_in_byte);
 
                     let mut byte = value >> (remaining_len - bits_to_write);
-                    byte = byte << (8 - bits_to_write);
-                    byte = byte >> bit_offset_in_byte;
+                    byte <<= (8 - bits_to_write);
+                    byte >>= bit_offset_in_byte;
 
-                    arr[byte_offset] = arr[byte_offset] | byte as u8;
+                    arr[byte_offset] |= byte as u8;
 
                     remaining_len -= bits_to_write;
                     offset += bits_to_write;
