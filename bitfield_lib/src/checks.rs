@@ -1,5 +1,5 @@
 /// ```rust
-/// # use bitfield_lib::check::*;
+/// # use bitfield_lib::checks::*;
 /// // test: (0 + 1) + 7 == impl TotalSizeIsMultipleOfEightBits
 /// fn _test() -> impl TotalSizeIsMultipleOfEightBits {
 ///     let _zero: <<ZeroMod8 as AddMod8<OneMod8>>::Output as AddMod8<SevenMod8>>::Output = ZeroMod8;
