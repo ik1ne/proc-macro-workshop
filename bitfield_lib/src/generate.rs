@@ -20,7 +20,6 @@ fn generate_token_stream_for_bitfield_type(i: usize) -> proc_macro2::TokenStream
             const BITS: usize = #i;
             type BitFieldType = #bit_field_type;
 
-            /// offset: bit(not byte) offset from the beginning of the array
             fn get(arr: &[u8], mut bit_offset: usize) -> Self::BitFieldType {
                 let mut value = 0u64;
                 let mut remaining_len = Self::BITS;

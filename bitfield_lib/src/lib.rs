@@ -1,4 +1,5 @@
 mod bitfield;
+pub mod check;
 mod generate;
 
 pub use bitfield::bitfield_inner;
