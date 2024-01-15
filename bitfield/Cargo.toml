@@ -13,4 +13,5 @@ path = "tests/progress.rs"
 trybuild = { version = "1.0.49", features = ["diff"] }
 
 [dependencies]
-bitfield-impl = { path = "impl" }
+bitfield_derive = { path = "../bitfield_derive" }
+bitfield_lib = { path = "../bitfield_lib" }

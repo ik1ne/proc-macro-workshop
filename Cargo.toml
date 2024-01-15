@@ -7,6 +7,8 @@ publish = false
 [workspace]
 members = [
     "bitfield",
+    "bitfield_derive",
+    "bitfield_lib",
     "builder",
     "debug",
     "debug_lib",
@@ -27,6 +29,7 @@ syn = { version = "2", features = ["full"] }
 
 derive_debug = { path = "debug" }
 
+bitfield_lib = { path = "bitfield_lib" }
 debug_lib = { path = "debug_lib" }
 seq_lib = { path = "seq_lib" }
 sorted_lib = { path = "sorted_lib" }

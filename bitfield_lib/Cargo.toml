@@ -1,11 +1,8 @@
 [package]
-name = "bitfield-impl"
+name = "bitfield_lib"
 version = "0.0.0"
 edition = "2021"
 publish = false
-
-[lib]
-proc-macro = true
 
 [dependencies]
 proc-macro2 = { workspace = true }

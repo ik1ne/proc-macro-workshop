@@ -2,17 +2,13 @@ use quote::quote;
 
 fn main() {
     let input = quote! {
-        pub fn region(&self) -> &str {
-        use self::Conference::*;
-
-        #[sorted]
-        match self {
-            RustFest => "Europe",
-            RustLatam => "Latin America",
-            _ => "elsewhere",
+        pub struct MyFourBytes {
+            a: B1,
+            b: B3,
+            c: B4,
+            d: B24,
         }
-    }
     };
 
-    println!("{}", sorted_lib::check::derive(quote! {}, input).unwrap());
+    println!("{}", bitfield_lib::bitfield_inner(input).unwrap());
 }
