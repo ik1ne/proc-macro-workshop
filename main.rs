@@ -1,14 +1,38 @@
-use quote::quote;
+// use quote::quote;
+//
+// fn main() {
+//     let input = quote! {
+//         pub struct MyFourBytes {
+//             a: B1,
+//             b: B3,
+//             c: B4,
+//             d: B24,
+//         }
+//     };
+//
+//     println!("{}", bitfield_lib::bitfield_inner(input).unwrap());
+// }
+
+use bitfield::*;
+
+#[bitfield]
+pub struct MyFourBytes {
+    a: B1,
+    b: B3,
+    c: B4,
+    d: B24,
+}
 
 fn main() {
-    let input = quote! {
-        pub struct MyFourBytes {
-            a: B1,
-            b: B3,
-            c: B4,
-            d: B24,
-        }
-    };
+    let mut bitfield = MyFourBytes::new();
+    assert_eq!(0, bitfield.get_a());
+    assert_eq!(0, bitfield.get_b());
+    assert_eq!(0, bitfield.get_c());
+    assert_eq!(0, bitfield.get_d());
 
-    println!("{}", bitfield_lib::bitfield_inner(input).unwrap());
+    bitfield.set_c(14);
+    assert_eq!(0, bitfield.get_a());
+    assert_eq!(0, bitfield.get_b());
+    assert_eq!(14, bitfield.get_c());
+    assert_eq!(0, bitfield.get_d());
 }
