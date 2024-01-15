@@ -12,4 +12,8 @@
 // (macro, trait, struct) through the one bitfield crate.
 pub use bitfield_impl::bitfield;
 
-// TODO other things
+pub trait Specifier {
+    const BITS: usize;
+}
+
+bitfield_impl::generate_bitfield_types!();
