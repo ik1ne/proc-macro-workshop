@@ -1,24 +1,9 @@
-use quote::quote;
+use bitfield::*;
 
-fn main() {
-    let input = quote! {
-        pub struct MyFourBytes {
-            a: B1,
-            b: B3,
-            c: B4,
-            d: B24,
-        }
-    };
-
-    println!("{}", bitfield_lib::bitfield_inner(input).unwrap());
+#[derive(BitfieldSpecifier)]
+pub enum TriggerMode {
+    Edge = 0,
+    Level = 1,
 }
 
-use bitfield::*;
-//
-// #[bitfield]
-// pub struct MyFourBytes {
-//     a: B1,
-//     b: B3,
-//     c: B4,
-//     d: B24,
-// }
+fn main() {}

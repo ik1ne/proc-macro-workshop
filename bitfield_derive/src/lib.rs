@@ -12,3 +12,10 @@ pub fn bitfield(_args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn generate_bitfield_types(_input: TokenStream) -> TokenStream {
     bitfield_lib::generate_token_stream_for_bitfield_types().into()
 }
+
+#[proc_macro_derive(BitfieldSpecifier)]
+pub fn derive_bitfield_specifier(input: TokenStream) -> TokenStream {
+    bitfield_lib::derive_bitfield_specifier::derive_bitfield_specifier(input.into())
+        .unwrap_or_else(Error::into_compile_error)
+        .into()
+}
