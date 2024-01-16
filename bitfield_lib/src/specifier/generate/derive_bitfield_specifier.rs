@@ -1,3 +1,4 @@
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::ItemEnum;
 
@@ -14,6 +15,14 @@ pub fn derive_bitfield_specifier(
     }: ItemEnum = syn::parse2(input)?;
 
     let num_fields = variants.len();
+
+    if num_fields.next_power_of_two() != num_fields {
+        return Err(syn::Error::new_spanned(
+            TokenStream::new(),
+            "BitfieldSpecifier expected a number of variants which is a power of 2",
+        ));
+    }
+
     let bytes = num_fields.next_power_of_two().trailing_zeros() as usize;
     let modulo_type = get_modulo_type(bytes);
 
