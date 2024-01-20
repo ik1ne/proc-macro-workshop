@@ -1,5 +1,5 @@
 [package]
-name = "bitfield-impl"
+name = "bitfield_macros"
 version = "0.0.0"
 edition = "2021"
 publish = false
@@ -8,4 +8,6 @@ publish = false
 proc-macro = true
 
 [dependencies]
-# TODO
+bitfield_lib = { path = "../bitfield_lib" }
+
+syn = "2"
