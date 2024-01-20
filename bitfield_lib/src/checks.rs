@@ -135,3 +135,28 @@ where
 {
     type Output = <<T as AddMod8<SixMod8>>::Output as AddMod8<OneMod8>>::Output;
 }
+
+pub type InRange<T> = <<T as TrueFalseArray>::Marker as DiscriminantInRange>::Check;
+
+pub enum True {}
+pub enum False {}
+
+pub trait DiscriminantInRange {
+    type Check;
+}
+
+impl DiscriminantInRange for True {
+    type Check = ();
+}
+
+pub trait TrueFalseArray {
+    type Marker;
+}
+
+impl TrueFalseArray for [(); 1] {
+    type Marker = True;
+}
+
+impl TrueFalseArray for [(); 0] {
+    type Marker = False;
+}
