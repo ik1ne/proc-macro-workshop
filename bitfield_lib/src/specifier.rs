@@ -12,6 +12,26 @@ pub trait ValueGetSet: Specifier {
     fn set(data: &mut [u8], bit_offset: usize, value: Self::ValueType);
 }
 
+impl Specifier for bool {
+    const BITS: usize = 1;
+}
+
+impl ValueGetSet for bool {
+    type ValueType = bool;
+
+    fn get(arr: &[u8], offset: usize) -> Self::ValueType {
+        arr[offset / 8] & (1 << (offset % 8)) != 0
+    }
+
+    fn set(arr: &mut [u8], offset: usize, value: Self::ValueType) {
+        if value {
+            arr[offset / 8] |= 1 << (offset % 8);
+        } else {
+            arr[offset / 8] &= !(1 << (offset % 8));
+        }
+    }
+}
+
 pub fn generate_specifier_impls() -> syn::Result<proc_macro2::TokenStream> {
     let impls = (1..=64).map(generate_specifier_impl);
 

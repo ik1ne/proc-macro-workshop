@@ -1,4 +1,4 @@
-pub use bitfield_macros::bitfield;
+pub use bitfield_macros::*;
 
 pub use bitfield_lib::*;
 
