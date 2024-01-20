@@ -1,5 +1,6 @@
-use quote::{format_ident, quote};
-use syn::{Field, ItemStruct};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
+use syn::spanned::Spanned;
+use syn::{Field, ItemStruct, MetaNameValue};
 
 pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
     let item: ItemStruct = syn::parse2(input.clone())?;
@@ -24,6 +25,7 @@ pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macr
 
     let mut field_getter_setter_impls = vec![];
     let mut accumulated_offset = vec![quote! { 0 }];
+    let mut bits_checks = vec![];
 
     for field in fields {
         field_getter_setter_impls.push(generate_field_getter_setter_impls(
@@ -31,11 +33,16 @@ pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macr
             &mut accumulated_offset,
             &item,
         )?);
+
+        if let Some(bit_check) = generate_bit_check(field) {
+            bits_checks.push(bit_check);
+        }
     }
 
     Ok(quote! {
         #(#attrs)*
         #[derive(Default)]
+        #[repr(C)]
         #vis struct #ident #impl_generics #type_generics #where_clause {
             data: [u8; (#(#field_type_as_specifier_bits)+*) / 8],
         }
@@ -51,6 +58,8 @@ pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macr
         fn _check() {
             let _: bitfield::checks::MultipleOfEight<[(); (#(#field_type_as_specifier_bits)+*) % 8]> = ();
         }
+
+        #(#bits_checks)*
     })
 }
 
@@ -90,4 +99,20 @@ fn generate_field_getter_setter_impls(
     accumulated_offset.push(quote! { <#field_ty as Specifier>::BITS });
 
     Ok(result)
+}
+
+fn generate_bit_check(field: &Field) -> Option<proc_macro2::TokenStream> {
+    let MetaNameValue { value, .. } = &field
+        .attrs
+        .iter()
+        .filter_map(|attr| attr.meta.require_name_value().ok())
+        .find(|meta| meta.path.get_ident().is_some_and(|ident| ident == "bits"))?;
+
+    let bits = value.to_token_stream().to_string().parse::<usize>().ok()?;
+
+    let field_ty = &field.ty;
+
+    Some(quote_spanned! {value.span()=>
+        const _: [(); #bits] = [(); <#field_ty as Specifier>::BITS];
+    })
 }
