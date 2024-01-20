@@ -1,18 +1,23 @@
-use quote::quote;
+use bitfield::*;
+
+#[bitfield]
+pub struct MyFourBytes {
+    a: B1,
+    b: B3,
+    c: B4,
+    d: B24,
+}
 
 fn main() {
-    let input = quote! {
-        pub fn region(&self) -> &str {
-            use self::Conference::*;
+    let mut bitfield = MyFourBytes::new();
+    assert_eq!(0, bitfield.get_a());
+    assert_eq!(0, bitfield.get_b());
+    assert_eq!(0, bitfield.get_c());
+    assert_eq!(0, bitfield.get_d());
 
-            #[sorted]
-            match self {
-                RustFest => "Europe",
-                RustLatam => "Latin America",
-                _ => "elsewhere",
-            }
-        }
-    };
-
-    println!("{}", sorted_lib::check::derive(quote! {}, input).unwrap());
+    bitfield.set_c(14);
+    assert_eq!(0, bitfield.get_a());
+    assert_eq!(0, bitfield.get_b());
+    assert_eq!(14, bitfield.get_c());
+    assert_eq!(0, bitfield.get_d());
 }
