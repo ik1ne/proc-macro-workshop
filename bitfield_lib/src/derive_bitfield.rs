@@ -1,4 +1,3 @@
-use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{Field, ItemStruct};
 
@@ -15,13 +14,17 @@ pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macr
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
-    let field_type_as_specifier_bits = fields.iter().map(|field| {
-        let ty = &field.ty;
-        quote! { <#ty as Specifier>::BITS }
-    });
+    let field_type_as_specifier_bits = fields
+        .iter()
+        .map(|field| {
+            let ty = &field.ty;
+            quote! { <#ty as Specifier>::BITS }
+        })
+        .collect::<Vec<_>>();
 
     let mut field_getter_setter_impls = vec![];
     let mut accumulated_offset = vec![quote! { 0 }];
+
     for field in fields {
         field_getter_setter_impls.push(generate_field_getter_setter_impls(
             field,
@@ -32,6 +35,7 @@ pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macr
 
     Ok(quote! {
         #(#attrs)*
+        #[derive(Default)]
         #vis struct #ident #impl_generics #type_generics #where_clause {
             data: [u8; (#(#field_type_as_specifier_bits)+*) / 8],
         }
@@ -40,19 +44,21 @@ pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macr
 
         impl #impl_generics #ident #type_generics #where_clause {
             pub fn new() -> Self {
-                Self {
-                    data: Default::default(),
-                }
+                Default::default()
             }
+        }
+
+        fn _check() {
+            let _: bitfield::checks::MultipleOfEight<[(); (#(#field_type_as_specifier_bits)+*) % 8]> = ();
         }
     })
 }
 
 fn generate_field_getter_setter_impls(
     field: &Field,
-    accumulated_offset: &mut Vec<TokenStream>,
+    accumulated_offset: &mut Vec<proc_macro2::TokenStream>,
     item_struct: &ItemStruct,
-) -> syn::Result<TokenStream> {
+) -> syn::Result<proc_macro2::TokenStream> {
     let Some(field_ident) = &field.ident else {
         return Err(syn::Error::new_spanned(
             field,

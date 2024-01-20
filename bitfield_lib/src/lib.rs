@@ -1,5 +1,7 @@
-pub use derive_bitfield::derive_bitfield;
-pub use specifier::{generate_specifier_impls, Specifier, ValueGetSet};
+pub use derive_bitfield::*;
+pub use specifier::*;
 
 mod derive_bitfield;
 mod specifier;
+
+pub mod checks;
