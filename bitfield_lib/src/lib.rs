@@ -1,4 +1,5 @@
 pub use derive_bitfield::*;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 pub use specifier::*;
 use syn::ItemEnum;
@@ -20,6 +21,13 @@ pub fn derive_bitfield_specifier(
 
     let num_fields = variants.len();
     let bytes = num_fields.next_power_of_two().trailing_zeros() as usize;
+
+    if num_fields.next_power_of_two() != num_fields {
+        return Err(syn::Error::new_spanned(
+            TokenStream::new(),
+            "BitfieldSpecifier expected a number of variants which is a power of 2",
+        ));
+    }
 
     let b_ty = format_ident!("B{}", bytes);
 
