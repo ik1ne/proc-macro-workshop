@@ -1,10 +1,6 @@
-use quote::quote;
-
+pub use derive_bitfield::derive_bitfield;
 pub use specifier::generate_specifier_impls;
 pub use specifier::Specifier;
 
+mod derive_bitfield;
 mod specifier;
-
-pub fn derive_bitfield(input: proc_macro2::TokenStream) -> syn::Result<proc_macro2::TokenStream> {
-    Ok(quote! {#input})
-}

@@ -26,3 +26,9 @@ path = "main.rs"
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
+
+[dependencies]
+bitfield = { path = "bitfield" }
+
+proc-macro2 = "1"
+quote = "1.0.35"
